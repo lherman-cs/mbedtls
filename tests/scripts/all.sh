@@ -21,11 +21,15 @@ CONFIG_H='include/mbedtls/config.h'
 CONFIG_BAK="$CONFIG_H.bak"
 
 MEMORY=0
+SHORT=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
         -m*)
             MEMORY=${1#-m}
+            ;;
+        -s)
+            SHORT=1
             ;;
         *)
             echo "Unknown argument: '$1'" >&2
@@ -83,6 +87,12 @@ msg "test/build: declared and exported names" # < 3s
 cleanup
 tests/scripts/check-names.sh
 
+if which doxygen >/dev/null; then
+    msg "test: doxygen warnings" # ~ 3s
+    cleanup
+    tests/scripts/doxygen.sh
+fi
+
 msg "build: create and build yotta module" # ~ 30s
 cleanup
 tests/scripts/yotta-build.sh
@@ -103,6 +113,11 @@ msg "test/build: ref-configs (ASan build)" # ~ 6 min 20s
 tests/scripts/test-ref-configs.pl
 
 # Most frequent issues are likely to be caught at this point
+if [ $SHORT -eq 1 ]; then
+    msg "Done, cleaning up"
+    cleanup
+    exit 0
+fi
 
 msg "build: with ASan (rebuild after ref-configs)" # ~ 1 min
 make
@@ -233,7 +248,7 @@ scripts/config.pl unset MBEDTLS_THREADING_PTHREAD
 scripts/config.pl unset MBEDTLS_THREADING_C
 scripts/config.pl unset MBEDTLS_MEMORY_BACKTRACE # execinfo.h
 scripts/config.pl unset MBEDTLS_MEMORY_BUFFER_ALLOC_C # calls exit
-CC=armcc WARNING_CFLAGS= make lib 2> armcc.stderr
+CC=armcc AR=armar WARNING_CFLAGS= make lib 2> armcc.stderr
 if [ -s armcc.stderr ]; then
     cat armcc.stderr
     exit 1;
